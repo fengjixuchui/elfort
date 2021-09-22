@@ -14,7 +14,6 @@
 # ===== Inner Interpreter =====
 
 code: docol
-    docol adr-docol!
     IP push-rs
     16 rax rax leaq  # add 16bytes (DOCOL)
     rax IP movq:rr

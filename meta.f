@@ -737,6 +737,47 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     lexicon: [meta:aux]
     [meta:aux] ALSO
 
+
+    # ----- Word address -----
+    [meta:aux] EDIT
+    
+    var: AdrLIT
+    var: AdrRET
+    var: AdrJMP
+    var: AdrJZ
+    var: AdrFetch
+    var: AdrStore
+    var: AdrLast
+    var: AdrHere
+    var: AdrConst
+    var: AdrDocol
+
+    : check-ref ( adr s -- adr ) over [ drop ] [ "not defined" epr panic ] if ;
+    : adr-LIT   AdrLIT   "LIT"     check-ref ;
+    : adr-RET   AdrRET   "RET"     check-ref ;
+    : adr-JMP   AdrJMP   "JMP"     check-ref ;
+    : adr-JZ    AdrJZ    "JZ"      check-ref ;
+    : adr-Fetch AdrFetch "@"       check-ref ;
+    : adr-Store AdrStore "!"       check-ref ;
+    : adr-Last  AdrLast  "last"    check-ref ;
+    : adr-Here  AdrHere  "here"    check-ref ;
+    : adr-Const AdrConst "const"   check-ref ;
+    : adr-Docol AdrDocol "docol"   check-ref ;
+
+    : meta:register-prim ( tadr name -- tadr name )
+        "LIT"   [ dup AdrLIT!   "LIT"   ] ;scase
+        "RET"   [ dup AdrRET!   "RET"   ] ;scase
+        "JMP"   [ dup AdrJMP!   "JMP"   ] ;scase
+        "JZ"    [ dup AdrJZ!    "JZ"    ] ;scase
+        "@"     [ dup AdrFetch! "@"     ] ;scase
+        "!"     [ dup AdrStore! "!"     ] ;scase
+        "last"  [ dup AdrLast!  "last"  ] ;scase
+        "here"  [ dup AdrHere!  "here"  ] ;scase
+        "const" [ dup AdrConst! "const" ] ;scase
+        "docol" [ dup AdrDocol! "docol" ] ;scase
+    ;
+    
+
     # ----- Macros -----
     [asm] EDIT
     
@@ -755,11 +796,9 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : save-regs    SP push RP push IP push TP push ;
     : restore-regs TP pop  IP pop  RP pop  SP pop  ;
 
-    var: adr-docol
-    
     : DOCOL
         # required 16 bytes
-        adr-docol rdx movq:wr  # 10bytes
+        adr-Docol rdx movq:wr  # 10bytes
         rdx jmpq               # 2bytes
         tp:align!              # -> 16bytes
     ;
@@ -767,43 +806,8 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : cfa>dfa 16 + ;
 
     
-    # ----- meta words -----
-    [meta:aux] EDIT
-    
-    var: AdrLIT
-    var: AdrRET
-    var: AdrJMP
-    var: AdrJZ
-    var: AdrFetch
-    var: AdrStore
-    var: AdrLast
-    var: AdrHere
-    var: AdrConst
-
-    : check-ref ( adr s -- adr ) over [ drop ] [ "not defined" epr panic ] if ;
-    : adr-LIT   AdrLIT   "LIT"     check-ref ;
-    : adr-RET   AdrRET   "RET"     check-ref ;
-    : adr-JMP   AdrJMP   "JMP"     check-ref ;
-    : adr-JZ    AdrJZ    "JZ"      check-ref ;
-    : adr-Fetch AdrFetch "@"       check-ref ;
-    : adr-Store AdrStore "!"       check-ref ;
-    : adr-Last  AdrLast  "last"    check-ref ;
-    : adr-Here  AdrHere  "here"    check-ref ;
-    : adr-Const AdrConst "const" check-ref ;
-
-    : meta:register-prim ( tadr name -- tadr name )
-        "LIT"   [ dup AdrLIT!   "LIT"   ] ;scase
-        "RET"   [ dup AdrRET!   "RET"   ] ;scase
-        "JMP"   [ dup AdrJMP!   "JMP"   ] ;scase
-        "JZ"    [ dup AdrJZ!    "JZ"    ] ;scase
-        "@"     [ dup AdrFetch! "@"     ] ;scase
-        "!"     [ dup AdrStore! "!"     ] ;scase
-        "last"  [ dup AdrLast!  "last"  ] ;scase
-        "here"  [ dup AdrHere!  "here"  ] ;scase
-        "const" [ dup AdrConst! "const" ] ;scase
-    ;
-
     # ----- meta header -----
+    [meta:aux] EDIT
 
     STRUCT: %mheader
          Word member: &mh-next     # radr: next entry
