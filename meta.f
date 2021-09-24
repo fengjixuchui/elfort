@@ -593,6 +593,10 @@ COVER
         0xE8 tb, t,
     ;
 
+    : retq
+        0xC3 tb,
+    ;
+
 
     SHOW # ----- Jmp -----
 
