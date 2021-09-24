@@ -434,6 +434,7 @@ nmax buf: nbuf  # max: 64(bit) for 0/1
 : <$ ( n nbase -- )
     nbase! n!
     nbuf nmax + np!
+    0 >nbuf
 ;
 
 : sign nsign [ CHAR: - >nbuf ] when ;
