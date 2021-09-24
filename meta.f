@@ -529,11 +529,13 @@ COVER
     ;
 
     : movq:rm ( src dst -- )
+        dup rbp = [ "use movq:rmo for rbp(SP)" panic ] ;when    
         dup >sib
         prefix64 0x89 tb,  mrm:MR mrm:mem tb,  sib,
     ;
 
     : movq:mr ( src dst -- )
+        over rbp = [ "use movq:mro for rbp(SP)" panic ] ;when
         over >sib
         prefix64 0x8b tb,  mrm:RM mrm:mem tb,  sib,
     ;
