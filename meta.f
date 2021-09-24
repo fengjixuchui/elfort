@@ -586,6 +586,14 @@ COVER
     ;
 
 
+    SHOW # ----- Call -----
+
+    : call:w ( tadr -- )
+        tp-adr 5 + ( to from ) - ( diff )
+        0xE8 tb, t,
+    ;
+
+
     SHOW # ----- Jmp -----
 
     : jmpq ( r -- )
