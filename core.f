@@ -14,7 +14,7 @@
 # ===== Inner Interpreter =====
 
 code: docol
-    IP push-rs
+    IP push
     16 rax rax leaq  # add 16bytes (DOCOL)
     rax IP movq:rr
     NEXT
@@ -25,14 +25,14 @@ code: LIT
     #     | LIT
     # IP: | n
     #     | next
-    TP push
+    TP push-ds
     IP TP movq:mr
     8 IP IP leaq
     NEXT
 ;
 
 code: RET
-    IP pop-rs
+    IP pop
     NEXT
 ;
 
@@ -47,7 +47,7 @@ code: JZ
     #     | JZ
     # IP: | adr
     TP rax movq:rr
-    TP pop    
+    TP pop-ds    
     rax rax testq:rr
     JMP jz:adr
     ( tos != 0 )
@@ -56,24 +56,24 @@ code: JZ
 ;
 
 prim: >r
-    TP push-rs
-    TP pop
+    TP push
+    TP pop-ds
 ;
 
 prim: r>
-    TP push
-    TP pop-rs
+    TP push-ds
+    TP pop
 ;
 
 prim: rdrop
-    8 RP RP leaq
+    rax pop
 ;
 
 : call ( q -- ) >r ;
 
 code: jmp ( adr -- )
     TP rax movq:rr
-    TP pop
+    TP pop-ds
     rax jmpq
 ;
 
@@ -82,46 +82,46 @@ code: jmp ( adr -- )
 # ===== Stack =====
 
 prim: dup
-    TP push
+    TP push-ds
 ;
 
 prim: swap
     TP rax movq:rr
-    SP TP movq:mr
-    rax SP movq:rm
+    SP TP 0 movq:mro
+    rax SP 0 movq:rmo
 ;
 
 prim: over
-    TP push
+    TP push-ds
     SP TP 8 movq:mro
 ;
 
 prim: drop
-    TP pop
+    TP pop-ds
 ;
 
 prim: nip ( a b -- b )
-    rax pop
+    rax pop-ds
 ;
 
 prim: tuck ( a b -- b a b )
-    rax pop
-    TP push
-    rax push
+    rax pop-ds
+    TP push-ds
+    rax push-ds
 ;
 
 prim: 2dup ( a b -- a b a b )
-    SP rax movq:mr  # a   | rax:a TP:b
-    TP push         # a b | rax:a TP:b
-    rax push
+    SP rax 0 movq:mro # a   | rax:a TP:b
+    TP push-ds        # a b | rax:a TP:b
+    rax push-ds
 ;
 
 prim: 2drop ( a b -- )
-    TP pop  TP pop
+    TP pop-ds  TP pop-ds
 ;
 
 prim: 3drop ( a b c -- )
-    TP pop  TP pop  TP pop
+    TP pop-ds  TP pop-ds  TP pop-ds
 ;
 
 : ?dup ( ? -- | ? ) dup IF dup THEN ;
@@ -135,9 +135,9 @@ prim: @
 ;
 
 prim: !
-    rax pop  # value
+    rax pop-ds  # value
     rax TP movq:rm
-    TP pop
+    TP pop-ds
 ;
 
 prim: b@
@@ -147,17 +147,17 @@ prim: b@
 ;
 
 prim: b!
-    rax pop  # value
+    rax pop-ds  # value
     rax TP movb:rm
-    TP pop
+    TP pop-ds
 ;
 
 prim: memclear ( adr len -- )
     rax rax xorq
-    TP rcx movq:rr
-    rdi pop
-    rep-stosb
-    TP pop
+    TP rcx movq:rr    
+    rdi pop-ds    
+    rep-stosb    
+    TP pop-ds
 ;
 
 
@@ -165,39 +165,39 @@ prim: memclear ( adr len -- )
 # ===== Arithmetics =====
 
 prim: +
-    rax pop
+    rax pop-ds
     rax TP addq:rr
 ;
 
 prim: -
-    rax pop
+    rax pop-ds
     TP rax subq:rr
     rax TP movq:rr
 ;
 
 prim: *
-    rax pop
+    rax pop-ds
     rax TP imulq:rr
 ;
 
 prim: /mod ( a b -- q r )
     rdx rdx xorq   # rdx:rax
-    rax pop        # dividee: a
+    rax pop-ds     # dividee: a
     TP idivq:r     # divider: b
-    rax push       # quotient
+    rax push-ds    # quotient
     rdx TP movq:rr # remainder
 ;
 
 prim: / ( a b -- q )
     rdx rdx xorq   # rdx:rax
-    rax pop        # dividee: a
+    rax pop-ds     # dividee: a
     TP idivq:r     # divider: b
     rax TP movq:rr # quotient
 ;
 
 prim: mod ( a b -- r )
     rdx rdx xorq   # rdx:rax
-    rax pop        # dividee: a
+    rax pop-ds     # dividee: a
     TP idivq:r     # divider: b
     rdx TP movq:rr # remainder
 ;
@@ -211,7 +211,7 @@ prim: 1-
 ;
 
 prim: cell
-    TP push
+    TP push-ds
     8 TP movq:wr
 ;
 
@@ -225,7 +225,7 @@ prim: cells
 # ===== Compare =====
 
 prim: =
-    rax pop ( rax TP -- TP )
+    rax pop-ds ( rax TP -- TP )
     TP rax cmpq:rr    
     rax sete    
     rax TP movzbq    
@@ -236,14 +236,14 @@ prim: =
 : not IF no ELSE yes THEN ;
 
 prim: > ( a b -- a>b )
-    rax pop ( rax TP -- rax>TP )
+    rax pop-ds ( rax TP -- rax>TP )
     TP rax cmpq:rr
     rax setg
     rax TP movzbq
 ;
 
 prim: >= ( a b -- a>=b )
-    rax pop ( rax TP -- rax>TP )
+    rax pop-ds ( rax TP -- rax>TP )
     TP rax cmpq:rr
     rax setge
     rax TP movzbq    
@@ -257,12 +257,12 @@ prim: >= ( a b -- a>=b )
 # ===== Logical =====
 
 prim: and
-    rax pop
+    rax pop-ds
     rax TP andq
 ;
 
 prim: or
-    rax pop
+    rax pop-ds
     rax TP orq
 ;
 
@@ -277,8 +277,8 @@ prim: inv
 prim: sys:read ( adr len fd -- len )
     ( read ) 0x00 rax movq:wr
     ( fd   ) TP rdi movq:rr
-    ( len  ) rdx pop
-    ( adr  ) rcx pop
+    ( len  ) rdx pop-ds
+    ( adr  ) rcx pop-ds
     rsi push
     rcx rsi movq:rr
     syscall
@@ -290,13 +290,13 @@ prim: sys:write ( adr len fd -- )
     # TODO: check to save/restore registers required?
     ( write ) 0x01 rax movq:wr
     ( fd    ) TP rdi movq:rr
-    ( len   ) rdx pop
-    ( adr   ) rcx pop  # actual: rsi
+    ( len   ) rdx pop-ds
+    ( adr   ) rcx pop-ds  # actual: rsi
     rsi push
     rcx rsi movq:rr
     syscall
     rsi pop
-    TP pop
+    TP pop-ds
 ;
 
 
@@ -713,6 +713,9 @@ var: here  # dictionary pointer
     swap IF drop RET THEN "Assertion failed: " pr panic
 ;
 
+: (test-rdrop) rdrop RET ;
+: test-rdrop (test-rdrop) ;
+
 : test-while
     0 [ dup 5 = IF STOP RET THEN 1+ GO ] while
     5 =  "while" assert
@@ -741,6 +744,7 @@ var: here  # dictionary pointer
 ;
 
 : test-all
+    test-rdrop
     test-while
     test-2dup
     test-s=
@@ -772,7 +776,7 @@ code: start
 code: main
     <EntryPoint>
 
-    setup-rsp    
+    setup-dsp
 
     ( clear TOS ) 0 TP movq:wr
 

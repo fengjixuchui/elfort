@@ -30,7 +30,7 @@ LEXI REFER [core] EDIT
 # ===== Const & Config =====
 
 4096 10 * as: MaxFileSize
-4096 as: ReturnStackSize
+4096 as: DataStackSize
 10 mega as: DictionarySize
 
 8 as: xcell  ( 64bit = 8byte )
@@ -257,9 +257,9 @@ LoadAdr MaxFileSize + align4096 var> BssAdr
 
 var: BssPtr ( current )
 
-BssAdr                          as: RSAdr
-RSAdr ReturnStackSize +         as: RSBottom
-RSBottom                        as: DictAdr
+BssAdr                          as: DSAdr
+DSAdr DataStackSize +           as: DSBottom
+DSBottom                        as: DictAdr
 DictAdr DictionarySize + qalign BssPtr!
 
 : bss:allot ( bytes -- adr ) BssPtr qalign dup >r + BssPtr! r> ;
@@ -462,8 +462,8 @@ COVER
     0x06 as: rsi
     0x07 as: rdi
 
-    rbp as: RP  # Return stack Pointer
-    rsp as: SP  # Data stack Pointer
+    rbp as: SP  # Data stack Pointer
+    rsp as: RP  # Return stack Pointer
     rsi as: IP  # Instruction Pointer
     rbx as: TP  # Top of data stack Pointer
 
@@ -790,14 +790,14 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     
     : NEXT lodsq rax jmpq ;  # Direct Threaded
     
-    : push-rs ( r -- )
-        RP 0 movq:rmo
-        xcell neg RP RP leaq
+    : push-ds ( r -- )
+        xcell neg SP SP leaq    
+        SP 0 movq:rmo
     ;
     
-    : pop-rs ( r -- )
-        RP swap xcell movq:mro
-        xcell RP RP leaq
+    : pop-ds ( r -- )
+        SP swap 0 movq:mro
+        xcell SP SP leaq
     ;
 
     : save-regs    SP push RP push IP push TP push ;
@@ -997,8 +997,8 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     # ----- Main routines -----
     [asm] EDIT
     
-    : setup-rsp
-         RSBottom xcell - RP movq:wr
+    : setup-dsp
+         DSBottom xcell - SP movq:wr
     ;
     
 
@@ -1101,6 +1101,12 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : ?h <IMMED> "HERE " pr ?stack ;
     : ?w ( w -- ) .hex ;
 
+    : BYEPRIM <IMMED>
+        0x3C rax movq:wr  # exit
+        0 rdi movq:wr    # exit code
+        syscall
+    ;
+
 END
 
 
@@ -1142,8 +1148,8 @@ TEMPORARY LEXI [meta:aux] [asm] [forth] REFER
 
     #DEBUG "LoadAdr  " pr LoadAdr  .hex
     #DEBUG "<bss>" prn
-    #DEBUG "    RSAdr    " pr RSAdr    .hex
-    #DEBUG "    RSBottom " pr RSBottom .hex
+    #DEBUG "    DSAdr    " pr DSAdr    .hex
+    #DEBUG "    DSBottom " pr DSBottom .hex
     #DEBUG "    BssAdr   " pr BssAdr   .hex
     #DEBUG "    BssSize  " pr bss-size .hex
     #DEBUG "<code>" prn
