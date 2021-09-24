@@ -478,6 +478,8 @@ COVER
     : mrm:op/3 ( m -- m ) 0b 00011000 or ;
     : mrm:op/4 ( m -- m ) 0b 00100000 or ;
     : mrm:op/5 ( m -- m ) 0b 00101000 or ;
+    : mrm:op/6 ( m -- m ) 0b 00110000 or ;
+    : mrm:op/7 ( m -- m ) 0b 00111000 or ;
 
     : mrm:RM ( src dst -- m )
         # src:reg dst:r/m
@@ -679,6 +681,11 @@ COVER
 
     : imulq:rr ( src dst -- )
         prefix64  0x0F tb,  0xAF tb,  mrm:RM mrm:reg tb,
+    ;
+
+    : idivq:r ( dst -- )
+        # rdx:rax by dst
+        prefix64  0xF7 tb,  mrm:reg mrm:op/7 tb,
     ;
 
 

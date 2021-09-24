@@ -180,6 +180,28 @@ prim: *
     rax TP imulq:rr
 ;
 
+prim: /mod ( a b -- q r )
+    rdx rdx xorq   # rdx:rax
+    rax pop        # dividee: a
+    TP idivq:r     # divider: b
+    rax push       # quotient
+    rdx TP movq:rr # remainder
+;
+
+prim: / ( a b -- q )
+    rdx rdx xorq   # rdx:rax
+    rax pop        # dividee: a
+    TP idivq:r     # divider: b
+    rax TP movq:rr # quotient
+;
+
+prim: mod ( a b -- r )
+    rdx rdx xorq   # rdx:rax
+    rax pop        # dividee: a
+    TP idivq:r     # divider: b
+    rdx TP movq:rr # remainder
+;
+
 prim: 1+
     TP incq:r
 ;
@@ -394,6 +416,58 @@ prim: sys:exit
 : space 0x20 putc ;
 
 : prn ( s -- ) pr cr ;
+
+
+
+# ----- numerical output -----
+
+: >hex ( n -- c ) dup 10 < IF 48 ELSE 55 THEN + ;
+
+var: np
+var: nsign
+var: nbase
+var: n
+65 as: nmax
+nmax buf: nbuf  # max: 64(bit) for 0/1
+: >nbuf ( c -- ) np 1- np! np b! ;
+
+: <$ ( n nbase -- )
+    nbase! n!
+    nbuf nmax + np!
+;
+
+: sign nsign [ CHAR: - >nbuf ] when ;
+
+: $u
+    [ n nbase /mod ( q r )
+      >hex >nbuf
+      0 [ STOP ] ;case
+      n! GO
+    ] while
+;
+
+: $s
+    n 0 < [ n -1 * n! yes ] [ no ] if nsign!
+    $u
+;
+
+: $> ( -- buf ) np ;
+
+: $d ( n -- s ) 10 <$ $s sign $> ;
+: $x ( n -- s ) 16 <$ $u      $> ;
+: $b ( n -- s ) 2  <$ $u      $> ;
+
+: ..  ( n -- ) $d pr ;
+: ..x ( n -- ) $x pr ;
+: ..b ( n -- ) $b pr ;
+
+: .  ( n -- ) ..  cr ;
+: .x ( n -- ) ..x cr ;
+: .b ( n -- ) ..b cr ;
+
+: ?  ( n -- n ) dup ..  space ;
+: ?x ( n -- n ) dup ..x space ;
+: ?b ( n -- n ) dup ..b space ;
 
 
 
