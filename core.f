@@ -637,12 +637,17 @@ var: here  # dictionary pointer
 : word:cfa!   ( adr w -- ) 3 cells + ! ;
 : word:dfa    ( w -- adr ) word:cfa 2 cells + ;
 
+: word:flag-on!  ( w flag -- )     over word:flags or  swap word:flags! ;
+: word:flag-off! ( w flag -- ) inv over word:flags and swap word:flags! ;
+
+: word:immed! ( w -- ) flag:immed  word:flag-on!  ;
+: word:hide!  ( w -- ) flag:hidden word:flag-on!  ;
+: word:show!  ( w -- ) flag:hidden word:flag-off! ;
+
 : word:immed?  ( w -- ? ) word:flags flag:immed  and ;
 : word:hidden? ( w -- ? ) word:flags flag:hidden and ;
 
-: <IMMED> ( -- )
-    last word:flags flag:immed or  last word:flags!
-;
+: <IMMED> ( -- ) <IMMED> last word:immed! ;
 
 : word:header, ( name -- )
     here:align! s,
@@ -670,8 +675,9 @@ var: here  # dictionary pointer
 
 : : ( -- q )
    read-token word:create
+   last word:hide!
    yes mode!
-   [ ' RET , no mode! ]
+   [ ' RET ,  no mode!  last word:show! ]
 ;
 
 : ; ( q -- ) >r ; <IMMED>
@@ -727,10 +733,18 @@ var: here  # dictionary pointer
     "foo" "bar" s= not "s= 4" assert
 ;
 
+: foo ok  ;
+: foo foo ;
+
+: test-hyperstatic
+    foo  "hyper static" assert
+;
+
 : test-all
     test-while
     test-2dup
     test-s=
+    test-hyperstatic
 ;
 
 : hello-s "hello!" ;

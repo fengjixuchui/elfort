@@ -1012,11 +1012,17 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     
     [meta] EDIT
 
+    TEMPORARY [forth] ALSO
     : : ( name: -- q )
         meta: DOCOL
-        [ adr-RET dq:w  no forth:mode! ]
+        forth:latest forth:hide!
         yes forth:mode!
+        [ adr-RET dq:w
+          no forth:mode!
+          forth:latest forth:show!
+        ]
     ;
+    END
 
     : ; ( q -- ) <IMMED> >r ;
 
