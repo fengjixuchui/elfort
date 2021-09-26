@@ -13,69 +13,44 @@
 
 # ===== Inner Interpreter =====
 
-code: docol
-    IP push
-    16 rax rax leaq  # add 16bytes (DOCOL)
-    rax IP movq:rr
-    NEXT
-;
-
-
-code: LIT
-    #     | LIT
-    # IP: | n
-    #     | next
-    TP push-ds
-    IP TP movq:mr
-    8 IP IP leaq
-    NEXT
-;
-
-code: RET
-    IP pop
-    NEXT
-;
-
-code: JMP
-    #     | JMP
-    # IP: | adr
-    IP IP movq:mr
-    NEXT
-;
-
-code: JZ
-    #     | JZ
-    # IP: | adr
-    TP rax movq:rr
-    TP pop-ds    
-    rax rax testq:rr
-    JMP jz:adr
-    ( tos != 0 )
-    lodsq
-    NEXT
-;
-
-prim: >r
-    TP push
-    TP pop-ds
-;
-
-prim: r>
-    TP push-ds
-    TP pop
-;
-
-prim: rdrop
-    rax pop
-;
-
-: call ( q -- ) >r ;
-
 code: jmp ( adr -- )
     TP rax movq:rr
     TP pop-ds
     rax jmpq
 ;
+
+prim: LIT ( -- )
+    #       | LIT
+    # ip -> | n
+    #       | next
+    rax pop  # ip
+    TP push-ds
+    rax TP movq:mr
+    8 rax rax leaq
+    rax push
+;
+
+prim: >r ( adr -- )
+    rax pop
+    TP push
+    rax push
+    TP pop-ds
+;
+
+prim: r> ( -- adr )
+    rax pop
+    TP push-ds
+    TP pop
+    rax push
+;
+
+prim: rdrop ( -- )
+    rax pop
+    rdx pop
+    rax push
+;
+
+: call ( q -- ) >r ;
 
 
 
@@ -149,6 +124,18 @@ prim: b@
 prim: b!
     rax pop-ds  # value
     rax TP movb:rm
+    TP pop-ds
+;
+
+prim: w@
+    rax rax xorq
+    TP rax 0 movw:mro
+    rax TP movq:rr
+;
+
+prim: w!
+    rax pop-ds  # value
+    rax TP 0 movw:rmo
     TP pop-ds
 ;
 
@@ -471,6 +458,16 @@ nmax buf: nbuf  # max: 64(bit) for 0/1
 : ?b ( n -- n ) dup ..b space ;
 
 
+( TODO: yokusuru )
+: dump ( adr len -- )
+    [
+        dup 0 <= [ drop STOP ] ;when
+        over b@ ..x space
+        [ 1+ ] [ 1- ] bi* GO
+    ] while cr
+;
+
+
 
 # ----- stdin -----
 
@@ -604,6 +601,7 @@ var: here  # dictionary pointer
 
 : ,  ( v -- ) here  ! here cell + here! ;
 : b, ( v -- ) here b! here 1+     here! ;
+: w, ( v -- ) here w! here 4 +    here! ;
 
 : allot ( bytes -- adr ) here tuck + here! ;
 
@@ -635,7 +633,6 @@ var: here  # dictionary pointer
 : word:flags! ( f w --   ) 2 cells + ! ;
 : word:cfa    ( w -- adr ) 3 cells + @ ;
 : word:cfa!   ( adr w -- ) 3 cells + ! ;
-: word:dfa    ( w -- adr ) word:cfa 2 cells + ;
 
 : word:flag-on!  ( w flag -- )     over word:flags or  swap word:flags! ;
 : word:flag-off! ( w flag -- ) inv over word:flags and swap word:flags! ;
@@ -658,32 +655,37 @@ var: here  # dictionary pointer
     here last word:cfa!
 ;
 
-: docol,
-    # cheating: this word has docol. copy it!
-    THIS-CFA [ @ , ] [ cell + @ , ] biq
+: call, ( adr -- )
+    here 5 + ( to from ) - ( diff )
+    0xE8 b, w,
 ;
 
-: const ( n -- ) mode [ ' LIT , ] when ;
+: ret,  0xC3 b, ;
+: lit, ' LIT call, ;
 
-: word:create ( name -- ) word:header, docol, ;
+: RET <IMMED> ret, ;
+
+: const ( n -- ) mode [ lit, , ] when ;
+
+: word:create ( name -- ) word:header, ;
 
 : word:handle ( word -- )
     [ word:cfa ] [ word:immed? ] biq
-    ( immediate ) [ jmp ] ;when
-    mode [ , ] [ jmp ] if
+    ( immediate ) [ call ] ;when
+    mode [ call, ] [ call ] if
 ;
 
 : : ( -- q )
    read-token word:create
    last word:hide!
    yes mode!
-   [ ' RET ,  no mode!  last word:show! ]
+   [ ret,  no mode!  last word:show! ]
 ;
 
 : ; ( q -- ) >r ; <IMMED>
 
 : handle-num ( n -- )
-    mode [ ' LIT , , ] ;when
+    mode [ lit, , ] ;when
 ;
 
 : word:find ( name -- word yes | name no )
@@ -718,7 +720,7 @@ var: here  # dictionary pointer
 
 : test-while
     0 [ dup 5 = IF STOP RET THEN 1+ GO ] while
-    5 =  "while" assert
+    5 = "while" assert
 ;
 
 : test-2dup
@@ -767,10 +769,10 @@ var: here  # dictionary pointer
 # ======================
 
 code: start
-    cbuf:init dq:w
-    test-all dq:w
-    repl dq:w
-    bye dq:w
+    cbuf:init call:w
+    test-all call:w
+    repl call:w
+    bye call:w
 ;
 
 
@@ -782,6 +784,6 @@ code: main
     ( clear TOS ) 0 TP movq:wr
 
     ( start inner interpreter )
-    start IP movq:wr NEXT
+    start jmp:w
 ;
 
