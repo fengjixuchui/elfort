@@ -30,7 +30,7 @@ LEXI REFER [core] EDIT
 # ===== Const & Config =====
 
 4096 10 * as: MaxFileSize
-4096 as: DataStackSize
+4096 as: ReturnStackSize
 10 mega as: DictionarySize
 
 8 as: xcell  ( 64bit = 8byte )
@@ -257,9 +257,9 @@ LoadAdr MaxFileSize + align4096 var> BssAdr
 
 var: BssPtr ( current )
 
-BssAdr                          as: DSAdr
-DSAdr DataStackSize +           as: DSBottom
-DSBottom                        as: DictAdr
+BssAdr                          as: RSAdr
+RSAdr ReturnStackSize +         as: RSBottom
+RSBottom                        as: DictAdr
 DictAdr DictionarySize + qalign BssPtr!
 
 : bss:allot ( bytes -- adr ) BssPtr qalign dup >r + BssPtr! r> ;
@@ -462,8 +462,8 @@ COVER
     0x06 as: rsi
     0x07 as: rdi
 
-    rbp as: SP  # Data stack Pointer
-    rsp as: RP  # Return stack Pointer
+    rbp as: RP  # Return stack Pointer
+    rsp as: SP  # Data stack Pointer
     rsi as: IP  # Instruction Pointer
     rbx as: TP  # Top of data stack Pointer
 
@@ -517,9 +517,6 @@ COVER
         tp-adr - >rel8
     ;
 
-    : v>r ( &v -- &r ) LoadAdr - t>r ;
-
-
 
     SHOW # ----- Mov -----
 
@@ -532,13 +529,11 @@ COVER
     ;
 
     : movq:rm ( src dst -- )
-        dup rbp = [ "use movq:rmo for rbp(SP)" panic ] ;when    
         dup >sib
         prefix64 0x89 tb,  mrm:MR mrm:mem tb,  sib,
     ;
 
     : movq:mr ( src dst -- )
-        over rbp = [ "use movq:mro for rbp(SP)" panic ] ;when
         over >sib
         prefix64 0x8b tb,  mrm:RM mrm:mem tb,  sib,
     ;
@@ -569,18 +564,6 @@ COVER
         dup >sib  0x88 tb,  mrm:MR mrm:mem tb,  sib,
     ;
 
-    : movw:mro ( src dst offset -- )
-        >r
-        over >sib  0x8B tb, mrm:RM mrm:d8 tb, sib,
-        r> tb,
-    ;
-
-    : movw:rmo ( src dst offset -- )
-        >r
-        dup >sib  0x89 tb,  mrm:MR mrm:d8 tb, sib,
-        r> tb,
-    ;
-
 
     SHOW # ----- Logical -----
 
@@ -601,18 +584,6 @@ COVER
     ;
 
 
-    SHOW # ----- Call -----
-
-    : call:w ( tadr -- )
-        tp-adr 5 + ( to from ) - ( diff )
-        0xE8 tb, t,
-    ;
-
-    : retq
-        0xC3 tb,
-    ;
-
-
     SHOW # ----- Jmp -----
 
     : jmpq ( r -- )
@@ -630,33 +601,10 @@ COVER
         0x74 tb, tb,
     ;
 
-    : jz:prep ( -- &v:patch )
-        0x74 tb,  tp-adr  0 tb,
-    ;
-
-    : jz:patch ( &v:patch &v:dst -- )
-        over 1 + - ( diff ) >rel8
-        swap v>r b!
-    ;
-
     : jz:adr ( tadr -- )
         here>rel8  # before jz:8 )
         2 -        # jz:8 jumps from address after itself.
         jz:8
-    ;
-
-    : jmp:w ( &v:dst -- )
-        tp-adr 5 + ( to from ) - ( diff )
-        0xE9 tb, t,    
-    ;
-
-    : jmp:prep ( -- &v:patch )
-        0xE9 tb,  tp-adr  0 t,
-    ;
-
-    : jmp:patch ( &v:patch &v:dst -- )
-        over  4 + ( after jmp )  - ( diff )
-        swap v>r !
     ;
 
 
@@ -809,6 +757,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     var: AdrLast
     var: AdrHere
     var: AdrConst
+    var: AdrDocol
 
     : check-ref ( adr s -- adr ) over [ drop ] [ "not defined" epr panic ] if ;
     : adr-LIT   AdrLIT   "LIT"     check-ref ;
@@ -820,6 +769,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : adr-Last  AdrLast  "last"    check-ref ;
     : adr-Here  AdrHere  "here"    check-ref ;
     : adr-Const AdrConst "const"   check-ref ;
+    : adr-Docol AdrDocol "docol"   check-ref ;
 
     : meta:register-prim ( tadr name -- tadr name )
         "LIT"   [ dup AdrLIT!   "LIT"   ] ;scase
@@ -831,26 +781,38 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         "last"  [ dup AdrLast!  "last"  ] ;scase
         "here"  [ dup AdrHere!  "here"  ] ;scase
         "const" [ dup AdrConst! "const" ] ;scase
+        "docol" [ dup AdrDocol! "docol" ] ;scase
     ;
     
 
     # ----- Macros -----
     [asm] EDIT
     
-    : push-ds ( r -- )
-        xcell neg SP SP leaq    
-        SP 0 movq:rmo
+    : NEXT lodsq rax jmpq ;  # Direct Threaded
+    
+    : push-rs ( r -- )
+        RP 0 movq:rmo
+        xcell neg RP RP leaq
     ;
     
-    : pop-ds ( r -- )
-        SP swap 0 movq:mro
-        xcell SP SP leaq
+    : pop-rs ( r -- )
+        RP swap xcell movq:mro
+        xcell RP RP leaq
     ;
 
     : save-regs    SP push RP push IP push TP push ;
     : restore-regs TP pop  IP pop  RP pop  SP pop  ;
 
+    : DOCOL
+        # required 16 bytes
+        adr-Docol rdx movq:wr  # 10bytes
+        rdx jmpq               # 2bytes
+        tp:align!              # -> 16bytes
+    ;
 
+    : cfa>dfa 16 + ;
+
+    
     # ----- meta header -----
     [meta:aux] EDIT
 
@@ -893,7 +855,9 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         : build-xconst ( mh -- )
             build-xnormal
             tp:align! tp-adr >r
-            adr-LIT call:w  cfa dq:w  adr-Const jmp:w
+            DOCOL
+            adr-LIT dq:w  cfa dq:w
+            adr-JMP dq:w adr-Const cfa>dfa dq:w
             r> 0 hdr xh-code!
         ;
     END
@@ -908,7 +872,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     END
 
     : var-adr ( tadr -- radr )
-        5 + ( call LIT )  LoadAdr -  t@  LoadAdr - t>r
+        24 + ( DOCOL + LIT )  LoadAdr -  t@  LoadAdr - t>r
     ;
 
     : patch-var! ( v tadr -- )
@@ -967,7 +931,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         # create normal word
         meta:create-header
         POSTPONE: <IMMED>
-        LIT, , JMP, [ forth:mode [ call:w ] when ] ,
+        LIT, , JMP, [ forth:mode [ dq:w ] when ] ,
     ;
 
     : meta: ( name: -- )
@@ -977,7 +941,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : meta:const ( n name -- )
         meta:create-header drop POSTPONE: <IMMED>
         [ build-xconst ] mlatest mh-builder!
-        LIT, , JMP, [ forth:mode [ adr-LIT call:w dq:w ] when ] ,
+        LIT, , JMP, [ forth:mode [ adr-LIT dq:uw dq:w ] when ] ,
     ;
 
     var: var-name
@@ -994,11 +958,11 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         dq:w
         ( getter )
         var-name meta:create
-        adr-LIT call:w var-adr dq:w adr-Fetch call:w retq
+        DOCOL adr-LIT dq:w var-adr dq:w adr-Fetch dq:w adr-RET dq:w
         ( setter )
         var-name "!" s:append!
         var-name meta:create
-        adr-LIT call:w var-adr dq:w adr-Store call:w retq
+        DOCOL adr-LIT dq:w var-adr dq:w adr-Store dq:w adr-RET dq:w
     ;
 
     : meta:var> ( n name: -- )
@@ -1006,13 +970,14 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     ;
 
     : meta:handle-num ( n -- )
-        forth:mode [ adr-LIT call:w dq:w ] when
+        forth:mode [ adr-LIT dq:w dq:w ] when
     ;
 
     : meta:parse-string
-        forth:mode [ ( -- &v:str &v:patch )
-          jmp:prep tp:align! tp-adr swap
-        ] [ tp:align! tp-adr ] if
+        tp:align!
+        forth:mode [ ( -- JmpAdr PatchAdr )
+          adr-JMP dq:w tp t>r 0 dq:w tp-adr swap
+        ] [ tp-adr ] if
         forth:take drop ( skip first double quote )
         [ forth:take
             0  [ "Unclosed string" panic STOP ] ;case
@@ -1025,24 +990,17 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
             tb, GO
         ] while
         0 tb, tp:align!
-        forth:mode [ tp-adr jmp:patch adr-LIT call:w dq:w ] when 
+        forth:mode [ tp-adr swap ! adr-LIT dq:w dq:w ] when 
     ;
 
 
     # ----- Main routines -----
     [asm] EDIT
     
-    : setup-dsp
-         DSBottom xcell - SP movq:wr
+    : setup-rsp
+         RSBottom xcell - RP movq:wr
     ;
-
-    # ----- debug -----
-    [core] EDIT
-    : bye-prim
-        0x3C rax movq:wr  # exit
-        0 rdi movq:wr    # exit code
-        syscall
-    ;
+    
 
     # ----- Codeword -----
     [core] EDIT
@@ -1056,24 +1014,22 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
 
     TEMPORARY [forth] ALSO
     : : ( name: -- q )
-        meta:
+        meta: DOCOL
         forth:latest forth:hide!
         yes forth:mode!
-        [ retq
+        [ adr-RET dq:w
           no forth:mode!
           forth:latest forth:show!
         ]
     ;
     END
 
-    : BYEPRIM bye-prim ;
-
     : ; ( q -- ) <IMMED> >r ;
 
     : code: ( name: -- q ) start-codeword ;
     
     : prim: ( name: -- q )
-        start-codeword [ retq >r ( END TEMPORARY )]
+        start-codeword [ NEXT >r ( END TEMPORARY )]
     ;
 
     : as: ( n name: -- )
@@ -1089,45 +1045,45 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         meta:const
     ;
 
-    : IF <IMMED> ( -- &v:patch q )
-        TP rax movq:rr
-        TP pop-ds
-        rax rax testq:rr
-        jz:prep
-        [ tp-adr jz:patch ]
+    : IF <IMMED> ( -- tp )
+        # compile: JZ 0
+        adr-JZ dq:w tp 0 dq:w
     ;
 
-    : THEN <IMMED> ( &v:patch q -- )
-        >r
+    : THEN <IMMED> ( tp -- )
+        # backpatch
+        tp-adr swap t!
     ;
 
-    : ELSE <IMMED> ( &v:patch q -- &v:patch q )
-        jmp:prep  ( &v:patch )  >r
-        call
-        r> [ tp-adr jmp:patch ]
+    : ELSE <IMMED> ( tp -- tp ) >r
+        adr-JMP dq:w tp 0 dq:w
+        tp-adr r> t!
     ;
-
-    : RET <IMMED> retq ;
 
     : [ <IMMED> ( -- &quot &patch q )
-        jmp:prep tp-adr swap
-        [ retq
-          tp-adr jmp:patch
-          adr-LIT call:w dq:w
-        ]
+        adr-JMP dq:w  tp 0 dq:w  tp-adr swap
+        [ adr-RET dq:w
+          tp-adr swap t!
+          adr-LIT dq:w dq:w ]
     ;
 
     : ] <IMMED> ( q -- ) >r ;
 
     : AGAIN <IMMED>
-        forth:latest forth:code cell + @ ( cfa )
-        jmp:w
+        adr-JMP dq:w
+        forth:latest forth:code cell + @ ( DOCOL adr )
+        16 + dq:w
+    ;
+
+    : THIS-CFA <IMMED>
+        forth:latest forth:code cell + @ ( DOCOL adr )
+        adr-LIT dq:w dq:w
     ;
 
     : ' <IMMED> ( name: -- )
         forth:read-find [ die ] ;unless
         forth:code cell + @ ( CFA )
-        forth:mode [ adr-LIT call:w dq:w ] ;when
+        forth:mode [ adr-LIT dq:w dq:w ] ;when
     ;
 
     : <IMMED> <IMMED> meta:immed-last ;
@@ -1138,7 +1094,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
             [ [ inc ] [ b@ ] biq ] c:escaped
             [ "Escape sequence required" panic ] ;unless
         ] when nip
-        forth:mode [ adr-LIT call:w dq:w ] when
+        forth:mode [ adr-LIT dq:w dq:w ] when
     ;
     
     : ?tp <IMMED> "tp " pr tp ..hex " adr " pr tp-adr .hex ;
@@ -1186,8 +1142,8 @@ TEMPORARY LEXI [meta:aux] [asm] [forth] REFER
 
     #DEBUG "LoadAdr  " pr LoadAdr  .hex
     #DEBUG "<bss>" prn
-    #DEBUG "    DSAdr    " pr DSAdr    .hex
-    #DEBUG "    DSBottom " pr DSBottom .hex
+    #DEBUG "    RSAdr    " pr RSAdr    .hex
+    #DEBUG "    RSBottom " pr RSBottom .hex
     #DEBUG "    BssAdr   " pr BssAdr   .hex
     #DEBUG "    BssSize  " pr bss-size .hex
     #DEBUG "<code>" prn

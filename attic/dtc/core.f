@@ -13,90 +13,115 @@
 
 # ===== Inner Interpreter =====
 
-code: jmp ( adr -- )
-    TP rax movq:rr
-    TP pop-ds
-    rax jmpq
+code: docol
+    IP push-rs
+    16 rax rax leaq  # add 16bytes (DOCOL)
+    rax IP movq:rr
+    NEXT
 ;
 
-prim: LIT ( -- )
-    #       | LIT
-    # ip -> | n
-    #       | next
-    rax pop  # ip
-    TP push-ds
-    rax TP movq:mr
-    8 rax rax leaq
-    rax push
-;
 
-prim: >r ( adr -- )
-    rax pop
+code: LIT
+    #     | LIT
+    # IP: | n
+    #     | next
     TP push
-    rax push
-    TP pop-ds
+    IP TP movq:mr
+    8 IP IP leaq
+    NEXT
 ;
 
-prim: r> ( -- adr )
-    rax pop
-    TP push-ds
+code: RET
+    IP pop-rs
+    NEXT
+;
+
+code: JMP
+    #     | JMP
+    # IP: | adr
+    IP IP movq:mr
+    NEXT
+;
+
+code: JZ
+    #     | JZ
+    # IP: | adr
+    TP rax movq:rr
+    TP pop    
+    rax rax testq:rr
+    JMP jz:adr
+    ( tos != 0 )
+    lodsq
+    NEXT
+;
+
+prim: >r
+    TP push-rs
     TP pop
-    rax push
 ;
 
-prim: rdrop ( -- )
-    rax pop
-    rdx pop
-    rax push
+prim: r>
+    TP push
+    TP pop-rs
+;
+
+prim: rdrop
+    8 RP RP leaq
 ;
 
 : call ( q -- ) >r ;
+
+code: jmp ( adr -- )
+    TP rax movq:rr
+    TP pop
+    rax jmpq
+;
 
 
 
 # ===== Stack =====
 
 prim: dup
-    TP push-ds
+    TP push
 ;
 
 prim: swap
     TP rax movq:rr
-    SP TP 0 movq:mro
-    rax SP 0 movq:rmo
+    SP TP movq:mr
+    rax SP movq:rm
 ;
 
 prim: over
-    TP push-ds
+    TP push
     SP TP 8 movq:mro
 ;
 
 prim: drop
-    TP pop-ds
+    TP pop
 ;
 
 prim: nip ( a b -- b )
-    rax pop-ds
+    rax pop
 ;
 
 prim: tuck ( a b -- b a b )
-    rax pop-ds
-    TP push-ds
-    rax push-ds
+    rax pop
+    TP push
+    rax push
 ;
 
 prim: 2dup ( a b -- a b a b )
-    SP rax 0 movq:mro # a   | rax:a TP:b
-    TP push-ds        # a b | rax:a TP:b
-    rax push-ds
+    SP rax movq:mr  # a   | rax:a TP:b
+    TP push         # a b | rax:a TP:b
+    rax push
 ;
 
 prim: 2drop ( a b -- )
-    TP pop-ds  TP pop-ds
+    TP pop  TP pop
 ;
 
 prim: 3drop ( a b c -- )
-    TP pop-ds  TP pop-ds  TP pop-ds
+    TP pop  TP pop  TP pop
 ;
 
 : ?dup ( ? -- | ? ) dup IF dup THEN ;
@@ -110,9 +135,9 @@ prim: @
 ;
 
 prim: !
-    rax pop-ds  # value
+    rax pop  # value
     rax TP movq:rm
-    TP pop-ds
+    TP pop
 ;
 
 prim: b@
@@ -122,29 +147,17 @@ prim: b@
 ;
 
 prim: b!
-    rax pop-ds  # value
+    rax pop  # value
     rax TP movb:rm
-    TP pop-ds
-;
-
-prim: w@
-    rax rax xorq
-    TP rax 0 movw:mro
-    rax TP movq:rr
-;
-
-prim: w!
-    rax pop-ds  # value
-    rax TP 0 movw:rmo
-    TP pop-ds
+    TP pop
 ;
 
 prim: memclear ( adr len -- )
     rax rax xorq
-    TP rcx movq:rr    
-    rdi pop-ds    
-    rep-stosb    
-    TP pop-ds
+    TP rcx movq:rr
+    rdi pop
+    rep-stosb
+    TP pop
 ;
 
 
@@ -152,39 +165,39 @@ prim: memclear ( adr len -- )
 # ===== Arithmetics =====
 
 prim: +
-    rax pop-ds
+    rax pop
     rax TP addq:rr
 ;
 
 prim: -
-    rax pop-ds
+    rax pop
     TP rax subq:rr
     rax TP movq:rr
 ;
 
 prim: *
-    rax pop-ds
+    rax pop
     rax TP imulq:rr
 ;
 
 prim: /mod ( a b -- q r )
     rdx rdx xorq   # rdx:rax
-    rax pop-ds     # dividee: a
+    rax pop        # dividee: a
     TP idivq:r     # divider: b
-    rax push-ds    # quotient
+    rax push       # quotient
     rdx TP movq:rr # remainder
 ;
 
 prim: / ( a b -- q )
     rdx rdx xorq   # rdx:rax
-    rax pop-ds     # dividee: a
+    rax pop        # dividee: a
     TP idivq:r     # divider: b
     rax TP movq:rr # quotient
 ;
 
 prim: mod ( a b -- r )
     rdx rdx xorq   # rdx:rax
-    rax pop-ds     # dividee: a
+    rax pop        # dividee: a
     TP idivq:r     # divider: b
     rdx TP movq:rr # remainder
 ;
@@ -198,7 +211,7 @@ prim: 1-
 ;
 
 prim: cell
-    TP push-ds
+    TP push
     8 TP movq:wr
 ;
 
@@ -212,7 +225,7 @@ prim: cells
 # ===== Compare =====
 
 prim: =
-    rax pop-ds ( rax TP -- TP )
+    rax pop ( rax TP -- TP )
     TP rax cmpq:rr    
     rax sete    
     rax TP movzbq    
@@ -223,14 +236,14 @@ prim: =
 : not IF no ELSE yes THEN ;
 
 prim: > ( a b -- a>b )
-    rax pop-ds ( rax TP -- rax>TP )
+    rax pop ( rax TP -- rax>TP )
     TP rax cmpq:rr
     rax setg
     rax TP movzbq
 ;
 
 prim: >= ( a b -- a>=b )
-    rax pop-ds ( rax TP -- rax>TP )
+    rax pop ( rax TP -- rax>TP )
     TP rax cmpq:rr
     rax setge
     rax TP movzbq    
@@ -244,12 +257,12 @@ prim: >= ( a b -- a>=b )
 # ===== Logical =====
 
 prim: and
-    rax pop-ds
+    rax pop
     rax TP andq
 ;
 
 prim: or
-    rax pop-ds
+    rax pop
     rax TP orq
 ;
 
@@ -264,8 +277,8 @@ prim: inv
 prim: sys:read ( adr len fd -- len )
     ( read ) 0x00 rax movq:wr
     ( fd   ) TP rdi movq:rr
-    ( len  ) rdx pop-ds
-    ( adr  ) rcx pop-ds
+    ( len  ) rdx pop
+    ( adr  ) rcx pop
     rsi push
     rcx rsi movq:rr
     syscall
@@ -277,13 +290,13 @@ prim: sys:write ( adr len fd -- )
     # TODO: check to save/restore registers required?
     ( write ) 0x01 rax movq:wr
     ( fd    ) TP rdi movq:rr
-    ( len   ) rdx pop-ds
-    ( adr   ) rcx pop-ds  # actual: rsi
+    ( len   ) rdx pop
+    ( adr   ) rcx pop  # actual: rsi
     rsi push
     rcx rsi movq:rr
     syscall
     rsi pop
-    TP pop-ds
+    TP pop
 ;
 
 
@@ -458,16 +471,6 @@ nmax buf: nbuf  # max: 64(bit) for 0/1
 : ?b ( n -- n ) dup ..b space ;
 
 
-( TODO: yokusuru )
-: dump ( adr len -- )
-    [
-        dup 0 <= [ drop STOP ] ;when
-        over b@ ..x space
-        [ 1+ ] [ 1- ] bi* GO
-    ] while cr
-;
-
-
 
 # ----- stdin -----
 
@@ -548,7 +551,6 @@ var: sacc
     0 sacc! ( s )
     [ ( s ) dup b@
       ( done ) 0 [ drop yes STOP ] ;case
-      ( skip ) CHAR: _ [ 1+ GO ] ;case
       ( NaN  ) c>hex [ drop no STOP ] ;unless ( s c )
       ( over ) dup sbase >= [ 2drop no STOP ] ;when
       ( ok   ) sacc sbase * + sacc!  1+ GO
@@ -556,7 +558,6 @@ var: sacc
     [ sacc ssign * yes ] [ no ] if
 ;
 
-: s>bin 2  s>n ;
 : s>dec 10 s>n ;
 : s>hex 16 s>n ;
 
@@ -603,7 +604,6 @@ var: here  # dictionary pointer
 
 : ,  ( v -- ) here  ! here cell + here! ;
 : b, ( v -- ) here b! here 1+     here! ;
-: w, ( v -- ) here w! here 4 +    here! ;
 
 : allot ( bytes -- adr ) here tuck + here! ;
 
@@ -635,6 +635,7 @@ var: here  # dictionary pointer
 : word:flags! ( f w --   ) 2 cells + ! ;
 : word:cfa    ( w -- adr ) 3 cells + @ ;
 : word:cfa!   ( adr w -- ) 3 cells + ! ;
+: word:dfa    ( w -- adr ) word:cfa 2 cells + ;
 
 : word:flag-on!  ( w flag -- )     over word:flags or  swap word:flags! ;
 : word:flag-off! ( w flag -- ) inv over word:flags and swap word:flags! ;
@@ -657,37 +658,32 @@ var: here  # dictionary pointer
     here last word:cfa!
 ;
 
-: call, ( adr -- )
-    here 5 + ( to from ) - ( diff )
-    0xE8 b, w,
+: docol,
+    # cheating: this word has docol. copy it!
+    THIS-CFA [ @ , ] [ cell + @ , ] biq
 ;
 
-: ret,  0xC3 b, ;
-: lit, ' LIT call, ;
+: const ( n -- ) mode [ ' LIT , ] when ;
 
-: RET <IMMED> ret, ;
-
-: const ( n -- ) mode [ lit, , ] when ;
-
-: word:create ( name -- ) word:header, ;
+: word:create ( name -- ) word:header, docol, ;
 
 : word:handle ( word -- )
     [ word:cfa ] [ word:immed? ] biq
-    ( immediate ) [ call ] ;when
-    mode [ call, ] [ call ] if
+    ( immediate ) [ jmp ] ;when
+    mode [ , ] [ jmp ] if
 ;
 
 : : ( -- q )
    read-token word:create
    last word:hide!
    yes mode!
-   [ ret,  no mode!  last word:show! ]
+   [ ' RET ,  no mode!  last word:show! ]
 ;
 
 : ; ( q -- ) >r ; <IMMED>
 
 : handle-num ( n -- )
-    mode [ lit, , ] ;when
+    mode [ ' LIT , , ] ;when
 ;
 
 : word:find ( name -- word yes | name no )
@@ -699,23 +695,9 @@ var: here  # dictionary pointer
     ] while
 ;
 
-: tk>hex ( s -- n yes | no )
-    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
-    dup b@  CHAR: x = [ drop no ] ;unless 1+
-    s>hex
-;
-
-: tk>bin ( s -- n yes | no )
-    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
-    dup b@  CHAR: b = [ drop no ] ;unless 1+
-    s>bin
-;
-
 : word:eval ( token -- ... ok | name ng )
     word:find [ word:handle yes ] ;when  # found
-    dup s>dec  [ nip handle-num yes ] ;when
-    dup tk>hex [ nip handle-num yes ] ;when
-    dup tk>bin [ nip handle-num yes ] ;when
+    dup s>dec [ nip handle-num yes ] ;when
     no
 ;
 
@@ -731,12 +713,9 @@ var: here  # dictionary pointer
     swap IF drop RET THEN "Assertion failed: " pr panic
 ;
 
-: (test-rdrop) rdrop RET ;
-: test-rdrop (test-rdrop) ;
-
 : test-while
     0 [ dup 5 = IF STOP RET THEN 1+ GO ] while
-    5 = "while" assert
+    5 =  "while" assert
 ;
 
 : test-2dup
@@ -762,7 +741,6 @@ var: here  # dictionary pointer
 ;
 
 : test-all
-    test-rdrop
     test-while
     test-2dup
     test-s=
@@ -785,21 +763,20 @@ var: here  # dictionary pointer
 # ======================
 
 code: start
-    cbuf:init call:w
-    test-all call:w
-    repl call:w
-    bye call:w
+    cbuf:init dq:w
+    test-all dq:w
+    repl dq:w
+    bye dq:w
 ;
-
 
 code: main
     <EntryPoint>
 
-    setup-dsp
+    setup-rsp    
 
     ( clear TOS ) 0 TP movq:wr
 
     ( start inner interpreter )
-    start jmp:w
+    start IP movq:wr NEXT
 ;
 
