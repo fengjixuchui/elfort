@@ -548,6 +548,7 @@ var: sacc
     0 sacc! ( s )
     [ ( s ) dup b@
       ( done ) 0 [ drop yes STOP ] ;case
+      ( skip ) CHAR: _ [ 1+ GO ] ;case
       ( NaN  ) c>hex [ drop no STOP ] ;unless ( s c )
       ( over ) dup sbase >= [ 2drop no STOP ] ;when
       ( ok   ) sacc sbase * + sacc!  1+ GO
@@ -555,6 +556,7 @@ var: sacc
     [ sacc ssign * yes ] [ no ] if
 ;
 
+: s>bin 2  s>n ;
 : s>dec 10 s>n ;
 : s>hex 16 s>n ;
 
@@ -697,9 +699,23 @@ var: here  # dictionary pointer
     ] while
 ;
 
+: tk>hex ( s -- n yes | no )
+    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
+    dup b@  CHAR: x = [ drop no ] ;unless 1+
+    s>hex
+;
+
+: tk>bin ( s -- n yes | no )
+    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
+    dup b@  CHAR: b = [ drop no ] ;unless 1+
+    s>bin
+;
+
 : word:eval ( token -- ... ok | name ng )
     word:find [ word:handle yes ] ;when  # found
-    dup s>dec [ nip handle-num yes ] ;when
+    dup s>dec  [ nip handle-num yes ] ;when
+    dup tk>hex [ nip handle-num yes ] ;when
+    dup tk>bin [ nip handle-num yes ] ;when
     no
 ;
 
