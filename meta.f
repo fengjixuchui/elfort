@@ -868,7 +868,24 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
          XWord member: &xh-code
     END
 
-    0 var> mlatest
+    STRUCT: %mlexi
+        Word member: &ml-next
+        Word member: &ml-last  ( mheader )
+        Word member: &ml-lexi  ( mheader of lexi word )
+    END
+
+    STRUCT: %xlexi
+        XWord member: &xl-name
+        XWord member: &xl-last
+    END
+
+    %mlexi allot as: mlexi:root
+    %mlexi allot as: mlexi:core
+
+    mlexi:root var> mcurrent ( editting )
+    : mlatest  ( -- mh ) mcurrent ml-last  ;
+    : mlatest! ( mh -- ) mcurrent ml-last! ;
+
     0 var> xlatest
 
     COVER
