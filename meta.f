@@ -253,6 +253,8 @@ var: t:sheader-code
 var: t:sheader-bss
 
 0x400000 var> LoadAdr
+: v>r ( &v -- &r ) LoadAdr - t>r ;
+
 LoadAdr MaxFileSize + align4096 var> BssAdr
 
 var: BssPtr ( current )
@@ -516,9 +518,6 @@ COVER
     : here>rel8 ( tadr -- )
         tp-adr - >rel8
     ;
-
-    : v>r ( &v -- &r ) LoadAdr - t>r ;
-
 
 
     SHOW # ----- Mov -----
@@ -859,6 +858,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
          Word member: &mh-word     # radr: meta word
          Word member: &mh-flags    # word: flags
          Word member: &mh-builder  # radr: dictbuilder ( metaword -- )
+         Word member: &mh-xheader  # built xheader ( radr )
     END
 
     STRUCT: %xheader
@@ -871,7 +871,8 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     STRUCT: %mlexi
         Word member: &ml-next
         Word member: &ml-last  ( mheader )
-        Word member: &ml-lexi  ( mheader of lexi word )
+        Word member: &ml-lexi  ( lexi on meta )
+        Word member: &ml-xlexi ( mheader of lexi )
     END
 
     STRUCT: %xlexi
@@ -886,9 +887,12 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : mlatest  ( -- mh ) mcurrent ml-last  ;
     : mlatest! ( mh -- ) mcurrent ml-last! ;
 
-    0 var> xlatest
+    0 var> xlatest  # for patching latest on cross env
+
+    : mh-xcode ( mh -- vadr ) mh-xheader xh-code ;
 
     COVER
+        var: mh
         var: word
         var: flags
         var: name
@@ -896,7 +900,9 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         var: cfa
         : hdr thdr LoadAdr - t>r ;
     SHOW
-        : build-xnormal ( mh -- ) [ mh-word word! ] [ mh-flags flags! ] biq
+        : build-xnormal ( mh -- ) mh!
+            mh mh-word word!
+            mh mh-flags flags!
             ( put xh-name )
             tp:align!  word forth:name  s>t t>adr name!
             ( allot xheader )
@@ -905,6 +911,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
             ( name  ) name  0 hdr xh-name!
             ( flags ) flags 0 hdr xh-flags!
             ( code  ) word forth:code cell + @ dup cfa! 0 hdr xh-code!
+            ( save  ) thdr v>r mh mh-xheader!
         ;
 
         : build-xconst ( mh -- )
