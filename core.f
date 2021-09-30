@@ -1,4 +1,5 @@
 # ===== Constants =====
+LEXI REFER [core] EDIT
 
 -1 as: ok
  0 as: ng

@@ -18,10 +18,11 @@ yes var> DEBUG-MODE
 LEXI REFER [root] EDIT
 lexicon: [asm]
 lexicon: [meta]
-lexicon: [cross]
+lexicon: [cross:root]
+lexicon: [cross:core]
 
-: into:meta LEXI [meta] [cross] [root] ORDER [cross] EDIT ;
-: into:code LEXI [asm] [meta] [cross] [root] ORDER [cross] EDIT ;
+: into:meta LEXI [meta] [cross:core] [root] ORDER [cross:core] EDIT ;
+: into:code LEXI [asm] [meta] [cross:core] [root] ORDER [cross:core] EDIT ;
 
 
 
@@ -880,12 +881,32 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         XWord member: &xl-last
     END
 
-    %mlexi allot as: mlexi:root
-    %mlexi allot as: mlexi:core
+    0 var> mlexi:last
+
+    : mlexi:create ( -- ml )
+        %mlexi allot
+        mlexi:last over ml-next!
+        dup mlexi:last!
+    ;
+
+    mlexi:create as: mlexi:root
+    [cross:root] mlexi:root ml-lexi!
+
+    mlexi:create as: mlexi:core
+    [cross:core] mlexi:core ml-lexi!
 
     mlexi:root var> mcurrent ( editting )
     : mlatest  ( -- mh ) mcurrent ml-last  ;
     : mlatest! ( mh -- ) mcurrent ml-last! ;
+
+    : mlexi:each ( q -- )  # q: mlexi --
+        mlexi:last [
+            0 [ drop STOP ] ;case
+            2dup ml-next >r >r
+            swap call
+            r> r> GO
+        ] while
+    ;
 
     0 var> xlatest  # for patching latest on cross env
 
@@ -977,12 +998,16 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     END
 
     : meta:build-xheaders
-        mlatest reverse! [
-            0 [ STOP ] ;case
-            dup >r
-            dup mh-builder call
-            r> mh-next GO
-        ] while
+        [
+            ml-last
+            0 [ ( no-op ) ] ;case
+            reverse! [ ( mheader -- )
+                0 [ STOP ] ;case
+                dup >r
+                dup mh-builder call
+                r> mh-next GO
+            ] while
+        ] mlexi:each
     ;
 
     # ----- meta word creation -----
@@ -1052,6 +1077,28 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         forth:mode [ tp-adr jmp:patch adr-LIT call:w dq:w ] when 
     ;
 
+    # ----- Lexicons -----
+    [core] EDIT
+    : meta:EDIT ( mlexi )
+        dup mcurrent! ml-lexi EDIT
+    ;
+
+    : meta:ALSO ( mlexi )
+        ml-lexi ALSO
+    ;
+
+    : meta:ORDER ( 0 mlexi ... -- )
+        LEXI ORDER
+        [root] ALSO
+        [ 0 [ STOP ] ;case
+          meta:ALSO GO
+        ] while
+        [meta] ALSO
+    ;
+
+    : meta:REFER ( 0 mlexi ... -- )
+        mlexi:core mlexi:root meta:ORDER
+    ;
 
     # ----- Main routines -----
     [asm] EDIT
@@ -1164,6 +1211,14 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         ] when nip
         forth:mode [ adr-LIT call:w dq:w ] when
     ;
+
+    : LEXI  0 ;
+    : EDIT  meta:EDIT ;
+    : ALSO  meta:ALSO ;
+    : ORDER meta:ORDER ;
+    : REFER meta:REFER ;
+    : [core] mlexi:core ;
+    : [root] mlexi:root ;
     
     : ?tp <IMMED> "tp " pr tp ..hex " adr " pr tp-adr .hex ;
     : ?h <IMMED> "HERE " pr ?stack ;
