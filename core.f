@@ -595,9 +595,9 @@ var: tp       # token pointer
 
 # ----- Dictionary -----
 
-var: last  # last defined word header
-var: mode  # compile:-1  run: 0
-var: here  # dictionary pointer
+var: last    # last defined word header
+var: mode    # compile:-1  run: 0
+var: here    # dictionary pointer
 
 : align ( n -- ) 7 + 7 inv and ;
 : here:align! here align here! ;
@@ -617,8 +617,6 @@ var: here  # dictionary pointer
     r>
 ;
 
-&core as: [core]
-&root as: [root]
 
 # ----- Word Header -----
 # 4 cells
@@ -630,6 +628,40 @@ var: here  # dictionary pointer
 lexicon: [forth]
 
 LEXI [forth] REFER [forth] EDIT
+
+
+# ----- Lexicon -----
+
+[forth] EDIT
+
+    var: lcur           # current editting lexicon
+    256 buf: lstack  # lexicon stack
+    lstack var> lp      # lexicon stack pointer )
+
+[root] EDIT
+
+    &core as: [core]
+    &root as: [root]
+
+    : ALSO ( lexi -- ) lp ! lp cell + lp! ;
+    : EDIT ( lexi -- ) lcur! ;
+    : LEXI ( -- 0 ) 0 ;
+    : ORDER ( 0 lexi .. -- )
+        lstack lp!
+        [ 0 [ STOP ] ;case  ALSO ] while
+    ;
+    : REFER [core] [root] ORDER ;
+    : CONTEXT ( -- 0 lexi .. )
+        0
+        lp [
+            lstack over > [ drop STOP ] ;when
+            dup @ swap cell - GO
+        ] while
+    ;
+
+# ----- Word -----
+
+[forth] EDIT
 
     0x01 as: flag:immed
     0x02 as: flag:hidden
@@ -806,11 +838,11 @@ LEXI REFER [core] EDIT
 # ===== Entrypoint =====
 # ======================
 
-code: start
-    cbuf:init call:w
-    test-all call:w
-    repl call:w
-    bye call:w
+: start
+    cbuf:init
+    test-all
+    repl
+    bye
 ;
 
 
