@@ -617,6 +617,8 @@ var: here  # dictionary pointer
     r>
 ;
 
+&core as: [core]
+&root as: [root]
 
 # ----- Word Header -----
 # 4 cells
@@ -625,106 +627,125 @@ var: here  # dictionary pointer
 # | flags
 # | code
 
-0x01 as: flag:immed
-0x02 as: flag:hidden
+lexicon: [forth]
 
-: word:next   ( w -- adr ) @ ;
-: word:next!  ( adr w -- ) ! ;
-: word:name   ( w -- adr ) cell + @ ;
-: word:name!  ( adr w -- ) cell + ! ;
-: word:flags  ( w -- f   ) 2 cells + @ ;
-: word:flags! ( f w --   ) 2 cells + ! ;
-: word:cfa    ( w -- adr ) 3 cells + @ ;
-: word:cfa!   ( adr w -- ) 3 cells + ! ;
+LEXI [forth] REFER [forth] EDIT
 
-: word:flag-on!  ( w flag -- )     over word:flags or  swap word:flags! ;
-: word:flag-off! ( w flag -- ) inv over word:flags and swap word:flags! ;
+    0x01 as: flag:immed
+    0x02 as: flag:hidden
 
-: word:immed! ( w -- ) flag:immed  word:flag-on!  ;
-: word:hide!  ( w -- ) flag:hidden word:flag-on!  ;
-: word:show!  ( w -- ) flag:hidden word:flag-off! ;
+[core] EDIT
 
-: word:immed?  ( w -- ? ) word:flags flag:immed  and ;
-: word:hidden? ( w -- ? ) word:flags flag:hidden and ;
+    : word:next   ( w -- adr ) @ ;
+    : word:next!  ( adr w -- ) ! ;
+    : word:name   ( w -- adr ) cell + @ ;
+    : word:name!  ( adr w -- ) cell + ! ;
+    : word:flags  ( w -- f   ) 2 cells + @ ;
+    : word:flags! ( f w --   ) 2 cells + ! ;
+    : word:cfa    ( w -- adr ) 3 cells + @ ;
+    : word:cfa!   ( adr w -- ) 3 cells + ! ;
 
-: <IMMED> ( -- ) <IMMED> last word:immed! ;
+[forth] EDIT    
 
-: word:header, ( name -- )
-    here:align! s,
-    here:align! 4 cells allot
-    last over word:next!  last!
-         last word:name!
-    0    last word:flags!
-    here last word:cfa!
-;
+    : word:flag-on!  ( w flag -- )     over word:flags or  swap word:flags! ;
+    : word:flag-off! ( w flag -- ) inv over word:flags and swap word:flags! ;
+    
+    : word:immed! ( w -- ) flag:immed  word:flag-on!  ;
+    : word:hide!  ( w -- ) flag:hidden word:flag-on!  ;
+    : word:show!  ( w -- ) flag:hidden word:flag-off! ;
+    
+    : word:immed?  ( w -- ? ) word:flags flag:immed  and ;
+    : word:hidden? ( w -- ? ) word:flags flag:hidden and ;
 
-: call, ( adr -- )
-    here 5 + ( to from ) - ( diff )
-    0xE8 b, w,
-;
+[core] EDIT
 
-: ret,  0xC3 b, ;
-: lit, ' LIT call, ;
+    : <IMMED> ( -- ) <IMMED> last word:immed! ;
+    
+    : word:header, ( name -- )
+        here:align! s,
+        here:align! 4 cells allot
+        last over word:next!  last!
+             last word:name!
+        0    last word:flags!
+        here last word:cfa!
+    ;
+    
+    : call, ( adr -- )
+        here 5 + ( to from ) - ( diff )
+        0xE8 b, w,
+    ;
+    
+    : ret,  0xC3 b, ;
+    : lit, ' LIT call, ;
+    
+    : RET <IMMED> ret, ;
 
-: RET <IMMED> ret, ;
+[forth] EDIT
 
-: const ( n -- ) mode [ lit, , ] when ;
+    : const ( n -- ) mode [ lit, , ] when ;
+    
+    : word:create ( name -- ) word:header, ;
+    
+    : word:handle ( word -- )
+        [ word:cfa ] [ word:immed? ] biq
+        ( immediate ) [ call ] ;when
+        mode [ call, ] [ call ] if
+    ;
 
-: word:create ( name -- ) word:header, ;
+[core] EDIT
 
-: word:handle ( word -- )
-    [ word:cfa ] [ word:immed? ] biq
-    ( immediate ) [ call ] ;when
-    mode [ call, ] [ call ] if
-;
+    : : ( -- q )
+       read-token word:create
+       last word:hide!
+       yes mode!
+       [ ret,  no mode!  last word:show! ]
+    ;
+    
+    : ; ( q -- ) >r ; <IMMED>
+    
+    : handle-num ( n -- )
+        mode [ lit, , ] ;when
+    ;
+    
+    : word:find ( name -- word yes | name no )
+        last [ ( name word )
+            0 [ no STOP ] ;case
+            dup word:hidden? [ word:next GO ] ;when
+            2dup word:name s= [ nip yes STOP ] ;when
+            word:next GO
+        ] while
+    ;
 
-: : ( -- q )
-   read-token word:create
-   last word:hide!
-   yes mode!
-   [ ret,  no mode!  last word:show! ]
-;
+[forth] EDIT
 
-: ; ( q -- ) >r ; <IMMED>
+    : tk>hex ( s -- n yes | no )
+        dup b@  CHAR: 0 = [ drop no ] ;unless 1+
+        dup b@  CHAR: x = [ drop no ] ;unless 1+
+        s>hex
+    ;
+    
+    : tk>bin ( s -- n yes | no )
+        dup b@  CHAR: 0 = [ drop no ] ;unless 1+
+        dup b@  CHAR: b = [ drop no ] ;unless 1+
+        s>bin
+    ;
 
-: handle-num ( n -- )
-    mode [ lit, , ] ;when
-;
+[core] EDIT
 
-: word:find ( name -- word yes | name no )
-    last [ ( name word )
-        0 [ no STOP ] ;case
-        dup word:hidden? [ word:next GO ] ;when
-        2dup word:name s= [ nip yes STOP ] ;when
-        word:next GO
-    ] while
-;
-
-: tk>hex ( s -- n yes | no )
-    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
-    dup b@  CHAR: x = [ drop no ] ;unless 1+
-    s>hex
-;
-
-: tk>bin ( s -- n yes | no )
-    dup b@  CHAR: 0 = [ drop no ] ;unless 1+
-    dup b@  CHAR: b = [ drop no ] ;unless 1+
-    s>bin
-;
-
-: word:eval ( token -- ... ok | name ng )
-    word:find [ word:handle yes ] ;when  # found
-    dup s>dec  [ nip handle-num yes ] ;when
-    dup tk>hex [ nip handle-num yes ] ;when
-    dup tk>bin [ nip handle-num yes ] ;when
-    no
-;
+    : word:eval ( token -- ... ok | name ng )
+        word:find [ word:handle yes ] ;when  # found
+        dup s>dec  [ nip handle-num yes ] ;when
+        dup tk>hex [ nip handle-num yes ] ;when
+        dup tk>bin [ nip handle-num yes ] ;when
+        no
+    ;
 
 
 
 # ===================
 # ===== Testing =====
 # ===================
+LEXI REFER [core] EDIT
 
 : die 1 sys:exit ;
 : panic ( s -- ) prn die ;

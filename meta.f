@@ -887,6 +887,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         %mlexi allot
         mlexi:last over ml-next!
         dup mlexi:last!
+        %xlexi t:allot t>adr over ml-xlexi!
     ;
 
     mlexi:create as: mlexi:root
@@ -1028,6 +1029,19 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         [ build-xconst ] mlatest mh-builder!
         LIT, , JMP, [ forth:mode [ adr-LIT call:w dq:w ] when ] ,
     ;
+
+    TEMPORARY [forth] ALSO
+        : meta:lexicon ( -- ml )
+            mlexi:create 
+            lexi:new over ml-lexi!
+        ;
+
+        : meta:lexicon: ( name: -- )
+            meta:lexicon
+            forth:read [ "lexicon name required" panic ] ;unless
+            meta:const
+        ;
+    END
 
     var: var-name
     var: var-adr
@@ -1217,8 +1231,17 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : ALSO  meta:ALSO ;
     : ORDER meta:ORDER ;
     : REFER meta:REFER ;
-    : [core] mlexi:core ;
-    : [root] mlexi:root ;
+    : lexicon: meta:lexicon: ;
+ 
+    : &core mlexi:core ml-xlexi ;
+    : [core] <IMMED>
+        mlexi:core forth:mode [ adr-LIT call:w ml-xlexi dq:w ] when
+    ;
+
+    : &root mlexi:root ml-xlexi ;
+    : [root]
+        mlexi:root forth:mode [ adr-LIT call:w ml-xlexi dq:w ] when
+    ;
     
     : ?tp <IMMED> "tp " pr tp ..hex " adr " pr tp-adr .hex ;
     : ?h <IMMED> "HERE " pr ?stack ;
