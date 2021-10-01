@@ -327,7 +327,7 @@ prim: sys:exit
 
 # ----- Combinator -----
 
-: dip ( a q -- ... ) swap >r call r> ;
+: dip ( a q -- ... a ) swap >r call r> ;
     # escape a, call q, then restore a
     # example:
     #   1 3 [ inc ] dip  => 2 3
@@ -595,7 +595,6 @@ var: tp       # token pointer
 
 # ----- Dictionary -----
 
-var: last    # last defined word header
 var: mode    # compile:-1  run: 0
 var: here    # dictionary pointer
 
@@ -631,12 +630,24 @@ LEXI [forth] REFER [forth] EDIT
 
 
 # ----- Lexicon -----
+# 2 cells
+# | name
+# | last
+
 
 [forth] EDIT
 
     var: lcur           # current editting lexicon
     256 buf: lstack  # lexicon stack
     lstack var> lp      # lexicon stack pointer )
+
+    : lexi:name  @ ;
+    : lexi:name! ! ;
+    : lexi:last  cell + @ ;
+    : lexi:last! cell + ! ;
+
+    : last  lcur lexi:last  ;
+    : last! lcur lexi:last! ;
 
 [root] EDIT
 
@@ -653,9 +664,37 @@ LEXI [forth] REFER [forth] EDIT
     : REFER [core] [root] ORDER ;
     : CONTEXT ( -- 0 lexi .. )
         0
-        lp [
-            lstack over > [ drop STOP ] ;when
-            dup @ swap cell - GO
+        lstack [
+            lp over < [ drop STOP ] ;when
+            dup @ swap cell + GO
+        ] while
+    ;
+    : CORE
+        lstack lp!
+        [root] lp ! lp cell + lp!
+        [core] lp ! lp cell + lp!
+        [core] lcur!
+    ;
+
+[core] EDIT
+
+    : lexi:find ( q -- )  # q: lexi -- ?
+        lp cell - [
+            lstack over > [ 2drop no STOP ] ;when
+            2dup >r >r
+            @ swap call IF rdrop rdrop yes STOP RET THEN
+            r> r> cell - GO
+        ] while
+    ;
+
+    : lexi:each ( q -- )  # q: lexi --
+        lp cell - [
+            cr "lp " pr dup .x
+            "ls " pr lstack .x
+            lstack over > [ 2drop no STOP ] ;when
+            2dup >r >r
+            @ swap call
+            r> r> cell - GO
         ] while
     ;
 
@@ -738,14 +777,18 @@ LEXI [forth] REFER [forth] EDIT
     : handle-num ( n -- )
         mode [ lit, , ] ;when
     ;
-    
-    : word:find ( name -- word yes | name no )
-        last [ ( name word )
+
+    : word:find-in ( name lexi -- word yes | name no )
+        lexi:last [ ( name word )
             0 [ no STOP ] ;case
             dup word:hidden? [ word:next GO ] ;when
             2dup word:name s= [ nip yes STOP ] ;when
             word:next GO
         ] while
+    ;
+
+    : word:find ( name -- word yes | name no )
+        [ ( name lexi ) word:find-in ] lexi:find
     ;
 
 [forth] EDIT
@@ -841,6 +884,7 @@ LEXI REFER [core] EDIT
 : start
     cbuf:init
     test-all
+    CORE
     repl
     bye
 ;

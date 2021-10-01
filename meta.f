@@ -817,7 +817,6 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : adr-JZ    AdrJZ    "JZ"      check-ref ;
     : adr-Fetch AdrFetch "@"       check-ref ;
     : adr-Store AdrStore "!"       check-ref ;
-    : adr-Last  AdrLast  "last"    check-ref ;
     : adr-Here  AdrHere  "here"    check-ref ;
     : adr-Const AdrConst "const"   check-ref ;
 
@@ -828,7 +827,6 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         "JZ"    [ dup AdrJZ!    "JZ"    ] ;scase
         "@"     [ dup AdrFetch! "@"     ] ;scase
         "!"     [ dup AdrStore! "!"     ] ;scase
-        "last"  [ dup AdrLast!  "last"  ] ;scase
         "here"  [ dup AdrHere!  "here"  ] ;scase
         "const" [ dup AdrConst! "const" ] ;scase
     ;
@@ -860,6 +858,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
          Word member: &mh-flags    # word: flags
          Word member: &mh-builder  # radr: dictbuilder ( metaword -- )
          Word member: &mh-xheader  # built xheader ( radr )
+         Word member: &mh-mlexi    # mlexi defined below
     END
 
     STRUCT: %xheader
@@ -890,11 +889,16 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         %xlexi t:allot t>adr over ml-xlexi!
     ;
 
-    mlexi:create as: mlexi:root
-    [cross:root] mlexi:root ml-lexi!
+    var: mlexi:root
+    var: mlexi:core
 
-    mlexi:create as: mlexi:core
-    [cross:core] mlexi:core ml-lexi!
+    : mlexi:setup
+        mlexi:create mlexi:root!
+       [cross:root] mlexi:root ml-lexi!
+
+        mlexi:create mlexi:core!
+        [cross:core] mlexi:core ml-lexi!    
+    ;
 
     mlexi:root var> mcurrent ( editting )
     : mlatest  ( -- mh ) mcurrent ml-last  ;
@@ -909,8 +913,6 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         ] while
     ;
 
-    0 var> xlatest  # for patching latest on cross env
-
     : mh-xcode ( mh -- vadr ) mh-xheader xh-code ;
 
     COVER
@@ -921,6 +923,10 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         var: thdr
         var: cfa
         : hdr thdr LoadAdr - t>r ;
+        : mlexi mh mh-mlexi ;
+        : xlexi mlexi ml-xlexi ;
+        : xlatest  ( -- w )   xlexi v>r xl-last drop ;
+        : xlatest! ( w -- ) 0 xlexi v>r xl-last! ;
     SHOW
         : build-xnormal ( mh -- ) mh!
             mh mh-word word!
@@ -963,7 +969,6 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
 
     : meta:patch-vars
         DictAdr adr-Here patch-var!
-        xlatest adr-Last patch-var!
     ;
 
     var: mhdr
@@ -971,6 +976,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         %mheader allot mhdr!
         mlatest mhdr mh-next!
         mhdr mlatest!
+        mcurrent mhdr mh-mlexi!
         0 mhdr mh-word! ( STUB )
         [ build-xnormal ] mhdr mh-builder!
     ;
@@ -1239,7 +1245,7 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     ;
 
     : &root mlexi:root ml-xlexi ;
-    : [root]
+    : [root] <IMMED>
         mlexi:root forth:mode [ adr-LIT call:w ml-xlexi dq:w ] when
     ;
     
@@ -1277,6 +1283,7 @@ TEMPORARY LEXI [meta:aux] [asm] [forth] REFER
     tp:align! tp CodeAdr!
     ' meta:handle-num   -> forth:handle-num
     ' meta:parse-string -> forth:parse-string
+    mlexi:setup
     TEMPORARY into:meta
     "core.f" include
     call ( END of TEMPORARY )
