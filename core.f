@@ -655,11 +655,12 @@ LEXI [forth] REFER [forth] EDIT
     &root as: [root]
 
     : ALSO ( lexi -- ) lp ! lp cell + lp! ;
+    : CURRENT ( -- lexi ) lcur ;
     : EDIT ( lexi -- ) lcur! ;
     : LEXI ( -- 0 ) 0 ;
     : ORDER ( 0 lexi .. -- )
         lstack lp!
-        [ 0 [ STOP ] ;case  ALSO ] while
+        [ 0 [ STOP ] ;case  ALSO GO ] while
     ;
     : REFER [core] [root] ORDER ;
     : CONTEXT ( -- 0 lexi .. )
@@ -668,12 +669,6 @@ LEXI [forth] REFER [forth] EDIT
             lp over < [ drop STOP ] ;when
             dup @ swap cell + GO
         ] while
-    ;
-    : CORE
-        lstack lp!
-        [root] lp ! lp cell + lp!
-        [core] lp ! lp cell + lp!
-        [core] lcur!
     ;
 
 [core] EDIT
@@ -814,6 +809,22 @@ LEXI [forth] REFER [forth] EDIT
     ;
 
 
+[forth] EDIT
+    : ?lexi:name ( lexi -- ) lexi:name ?dup [ "???" ] unless ;
+[core] EDIT
+    : ?words
+        "current: " pr CURRENT ?lexi:name prn
+        [ ( lexi )
+            "----- " pr dup ?lexi:name pr " -----" prn
+            lexi:last [
+                0 [ STOP ] ;case
+                dup word:name pr space
+                word:next GO
+            ] while cr
+        ] lexi:each
+    ;
+
+
 
 # ===================
 # ===== Testing =====
@@ -884,7 +895,7 @@ LEXI [forth] REFER [core] EDIT
 : start
     cbuf:init
     test-all
-    CORE
+    LEXI REFER [core] EDIT
     "[forth]" word:find [ word:name [forth] lexi:name! ] when
     "[root]" word:find [ word:name [root] lexi:name! ] when
     "[core]" word:find [ word:name [core] lexi:name! ] when

@@ -809,6 +809,10 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     var: AdrLast
     var: AdrHere
     var: AdrConst
+    var: AdrALSO
+    var: AdrEDIT
+    var: AdrLEXI
+    var: AdrREFER
 
     : check-ref ( adr s -- adr ) over [ drop ] [ "not defined" epr panic ] if ;
     : adr-LIT   AdrLIT   "LIT"     check-ref ;
@@ -819,6 +823,10 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
     : adr-Store AdrStore "!"       check-ref ;
     : adr-Here  AdrHere  "here"    check-ref ;
     : adr-Const AdrConst "const"   check-ref ;
+    : adr-ALSO  AdrALSO  "ALSO"    check-ref ;
+    : adr-EDIT  AdrEDIT  "EDIT"    check-ref ;
+    : adr-LEXI  AdrLEXI  "LEXI"    check-ref ;
+    : adr-REFER AdrREFER "REFER"   check-ref ;
 
     : meta:register-prim ( tadr name -- tadr name )
         "LIT"   [ dup AdrLIT!   "LIT"   ] ;scase
@@ -829,6 +837,10 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         "!"     [ dup AdrStore! "!"     ] ;scase
         "here"  [ dup AdrHere!  "here"  ] ;scase
         "const" [ dup AdrConst! "const" ] ;scase
+        "ALSO"  [ dup AdrALSO!  "ALSO"  ] ;scase
+        "EDIT"  [ dup AdrEDIT!  "EDIT"  ] ;scase
+        "LEXI"  [ dup AdrLEXI!  "LEXI"  ] ;scase
+        "REFER" [ dup AdrREFER! "REFER" ] ;scase
     ;
     
 
@@ -1241,11 +1253,10 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
         forth:mode [ adr-LIT call:w dq:w ] when
     ;
 
-    : LEXI  0 ;
-    : EDIT  meta:EDIT ;
-    : ALSO  meta:ALSO ;
-    : ORDER meta:ORDER ;
-    : REFER meta:REFER ;
+    : LEXI  <IMMED> forth:mode [ adr-LEXI call:w ] [ 0 ] if ;
+    : EDIT  <IMMED> forth:mode [ adr-EDIT call:w ] [ meta:EDIT ] if ;
+    : ALSO  <IMMED> forth:mode [ adr-ALSO call:w ] [ meta:ALSO ] if ;
+    : REFER <IMMED> forth:mode [ adr-REFER call:w ] [ meta:REFER ] if ;
     : lexicon: meta:lexicon: ;
  
     : &core mlexi:core ml-xlexi ;
