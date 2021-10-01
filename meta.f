@@ -1042,10 +1042,19 @@ TEMPORARY LEXI [asm] REFER [meta] EDIT
             lexi:new over ml-lexi!
         ;
 
+        : meta:lexiword ( ml name -- )
+            meta:create-header drop POSTPONE: <IMMED>
+            [ build-xconst ] mlatest mh-builder!
+            dup ml-xlexi
+            LIT, ( xlexi ) ,  LIT, ( mlexi ) , JMP, [
+                forth:mode [ drop adr-LIT call:w dq:w ] [ nip ] if
+            ] ,
+        ;
+
         : meta:lexicon: ( name: -- )
             meta:lexicon
             forth:read [ "lexicon name required" panic ] ;unless
-            meta:const
+            meta:lexiword
         ;
     END
 

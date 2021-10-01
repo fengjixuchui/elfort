@@ -689,8 +689,6 @@ LEXI [forth] REFER [forth] EDIT
 
     : lexi:each ( q -- )  # q: lexi --
         lp cell - [
-            cr "lp " pr dup .x
-            "ls " pr lstack .x
             lstack over > [ 2drop no STOP ] ;when
             2dup >r >r
             @ swap call
@@ -881,10 +879,15 @@ LEXI REFER [core] EDIT
 # ===== Entrypoint =====
 # ======================
 
+LEXI [forth] REFER [core] EDIT
+
 : start
     cbuf:init
     test-all
     CORE
+    "[forth]" word:find [ word:name [forth] lexi:name! ] when
+    "[root]" word:find [ word:name [root] lexi:name! ] when
+    "[core]" word:find [ word:name [core] lexi:name! ] when
     repl
     bye
 ;
