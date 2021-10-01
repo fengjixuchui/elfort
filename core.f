@@ -605,6 +605,22 @@ var: tp       # token pointer
     tbuf
 ;
 
+
+# ----- Escaped character -----
+
+: c:escaped ( qtake -- c ok | ng )
+    dup >r call r> swap ( q c )
+    ( no following sequence ) 0 [ drop ng ] ;case
+    ( \b bs      ) CHAR: b [ drop 8  ok ] ;case
+    ( \t htab    ) CHAR: t [ drop 9  ok ] ;case
+    ( \n newline ) CHAR: n [ drop 10 ok ] ;case
+    ( \r cr      ) CHAR: r [ drop 13 ok ] ;case
+    ( \" dquote  ) CHAR: " [ drop 34 ok ] ;case
+    ( \0 null    ) CHAR: 0 [ drop 0  ok ] ;case
+    ( as-is      ) nip ok
+;
+
+
 # ----- Dictionary -----
 
 var: mode    # compile:-1  run: 0
@@ -750,6 +766,15 @@ LEXI [forth] REFER [forth] EDIT
         here 5 + ( to from ) - ( diff )
         0xE8 b, w,
     ;
+
+    : jmp:prep, ( -- &patch )
+        0xE9 b, here 0 w,
+    ;
+
+    : jmp:patch ( &patch &dst -- )
+        over  4 + ( after jmp )  - ( diff )
+        swap w!
+    ;
     
     : ret,  0xC3 b, ;
     : lit, ' LIT call, ;
@@ -766,6 +791,23 @@ LEXI [forth] REFER [forth] EDIT
         [ word:cfa ] [ word:immed? ] biq
         ( immediate ) [ call ] ;when
         mode [ call, ] [ call ] if
+    ;
+
+    : parse-string ( -- &str | )
+        mode [ jmp:prep, here ] [ here ] if ( &str | &patch &str )
+        take drop ( skip first double quote )
+        [ take
+            0  [ "Unclosed string" panic STOP ] ;case
+            CHAR: " [ STOP ] ;case
+            dup CHAR: \\ = [
+                drop [ take ] c:escaped
+                [ "Escape sequence required" panic STOP ] ;unless
+                b, GO
+            ] ;when
+            b, GO
+        ] while
+        0 b, here:align!
+        mode [ here >r  lit, ,  r> jmp:patch ] when
     ;
 
 [core] EDIT
@@ -822,6 +864,13 @@ LEXI [forth] REFER [forth] EDIT
         dup tk>hex [ nip handle-num yes ] ;when
         dup tk>bin [ nip handle-num yes ] ;when
         no
+    ;
+
+    : interpret ( -- ... ok | name ng )
+        peek
+        CHAR: "  [ parse-string ok ] ;case
+        drop
+        read-token word:eval
     ;
 
 
@@ -902,9 +951,7 @@ lexicon: [test]
 : hello hello-s prn ;
 
 : repl
-    [ read-token
-      word:eval [ pr " ?" prn ] unless GO
-    ] while
+    [ interpret [ pr " ?" prn ] unless GO ] while
 ;
 
 
