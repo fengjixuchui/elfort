@@ -778,7 +778,9 @@ LEXI [forth] REFER [forth] EDIT
     ;
     
     : ; ( q -- ) >r ; <IMMED>
-    
+
+[forth] EDIT
+
     : handle-num ( n -- )
         mode [ lit, , ] ;when
     ;
@@ -791,6 +793,8 @@ LEXI [forth] REFER [forth] EDIT
             word:next GO
         ] while
     ;
+
+[core] EDIT
 
     : word:find ( name -- word yes | name no )
         [ ( name lexi ) word:find-in ] lexi:find
