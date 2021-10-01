@@ -407,6 +407,18 @@ prim: sys:exit
 
 
 
+# ----- panic / assert -----
+
+: die 1 sys:exit ;
+
+: panic ( s -- ) prn die ;
+
+: assert ( ? s -- )
+    swap IF drop RET THEN "Assertion failed: " pr panic
+;
+
+
+
 # ----- numerical output -----
 
 : >hex ( n -- c ) dup 10 < IF 48 ELSE 55 THEN + ;
@@ -839,13 +851,10 @@ LEXI [forth] REFER [forth] EDIT
 # ===================
 # ===== Testing =====
 # ===================
-LEXI REFER [core] EDIT
 
-: die 1 sys:exit ;
-: panic ( s -- ) prn die ;
-: assert ( ? s -- )
-    swap IF drop RET THEN "Assertion failed: " pr panic
-;
+LEXI REFER [core] EDIT
+lexicon: [test]
+[test] ALSO [test] EDIT
 
 : (test-rdrop) rdrop RET ;
 : test-rdrop (test-rdrop) ;
@@ -900,13 +909,14 @@ LEXI REFER [core] EDIT
 # ===== Entrypoint =====
 # ======================
 
-LEXI [forth] REFER [core] EDIT
+LEXI [forth] [test] REFER [core] EDIT
 
 : start
     cbuf:init
     test-all
     LEXI REFER [core] EDIT
     "[forth]" word:find [ word:name [forth] lexi:name! ] when
+    "[test]" word:find [ word:name [test] lexi:name! ] when
     "[root]" word:find [ word:name [root] lexi:name! ] when
     "[core]" word:find [ word:name [core] lexi:name! ] when
     repl
