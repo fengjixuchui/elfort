@@ -824,6 +824,16 @@ LEXI [forth] REFER [forth] EDIT
         ] lexi:each
     ;
 
+    : ?lexi
+        "LEXI " pr
+        [ ( lexi )
+            ?lexi:name pr space
+        ] lexi:each
+        "ORDER " pr
+        CURRENT ?lexi:name pr space
+        "EDIT" prn
+    ;
+
 
 
 # ===================
