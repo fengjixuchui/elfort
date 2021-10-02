@@ -910,6 +910,22 @@ LEXI [forth] REFER [forth] EDIT
     ;
 
 
+
+# ===== Quotation =====
+
+: [ ( -- &quot &patch q ) <IMMED>
+    jmp:prep, here swap
+    [ ret,
+      here jmp:patch
+      lit, ,
+    ]
+;
+
+: ] ( q -- ) >r ; <IMMED>
+
+
+
+
 # ===================
 # ===== Testing =====
 # ===================
