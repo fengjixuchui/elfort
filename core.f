@@ -712,12 +712,13 @@ LEXI [forth] REFER [forth] EDIT
 
     : lexi:each ( q -- )  # q: lexi --
         lp cell - [
-            lstack over > [ 2drop no STOP ] ;when
+            lstack over > [ 2drop STOP ] ;when
             2dup >r >r
             @ swap call
             r> r> cell - GO
         ] while
     ;
+
 
 # ----- Word -----
 
@@ -877,16 +878,25 @@ LEXI [forth] REFER [forth] EDIT
 [forth] EDIT
     : ?lexi:name ( lexi -- ) lexi:name ?dup [ "???" ] unless ;
 [core] EDIT
+
+    : word:each ( lexi q -- )  # q: word --
+        swap lexi:last [ ( q word )
+            0 [ drop STOP ] ;case
+            2dup >r >r
+            swap call
+            r> r> word:next GO
+        ] while
+    ;
+
     : ?words
-        "current: " pr CURRENT ?lexi:name prn
-        [ ( lexi )
+        0 ( acc )
+        "current: " pr CURRENT ?lexi:name prn cr
+        [ ( acc lexi -- acc )
             "----- " pr dup ?lexi:name pr " -----" prn
-            lexi:last [
-                0 [ STOP ] ;case
-                dup word:name pr space
-                word:next GO
-            ] while cr
+            [ word:name pr space 1+ ] word:each
+            cr cr
         ] lexi:each
+        .. " words available" prn
     ;
 
     : ?lexi
@@ -898,7 +908,6 @@ LEXI [forth] REFER [forth] EDIT
         CURRENT ?lexi:name pr space
         "EDIT" prn
     ;
-
 
 
 # ===================
