@@ -1,5 +1,8 @@
 ELFORT=out/elfort
 
+.PHONY: all
+all: out $(ELFORT)
+
 
 .PHONY: disasm
 disasm:
